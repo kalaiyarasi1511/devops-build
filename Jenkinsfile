@@ -2,20 +2,19 @@ pipeline {
     agent any
 
     environment {
-        // Docker Hub credentials stored in Jenkins
+        DOCKER_IMAGE = "kalaiyarasi15/dev:latest"
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials-id')
-        // GitHub credentials stored in Jenkins
-        GITHUB_CREDENTIALS = credentials('github-credentials')
-        REPO_URL = 'https://github.com/kalaiyarasi1511/devops-build.git'
-        IMAGE_NAME = 'kalaiyarasi15/devops-react'
+        GIT_CREDENTIALS = credentials('github-credentials')
+        EC2_USER = "ubuntu"
+        EC2_IP = "YOUR_EC2_PUBLIC_IP"   // replace with your EC2 public IP
+        SSH_KEY = credentials('ec2-ssh-key') // Jenkins credential for EC2 private key
     }
 
     stages {
-
-        stage('Checkout') {
+        stage('Checkout SCM') {
             steps {
-                git branch: "${env.BRANCH_NAME}", 
-                    url: "${REPO_URL}", 
+                git branch: 'dev',
+                    url: 'https://github.com/kalaiyarasi1511/devops-build.git',
                     credentialsId: 'github-credentials'
             }
         }
@@ -23,11 +22,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    if (env.BRANCH_NAME == 'dev') {
-                        sh "docker build -t ${IMAGE_NAME}:dev ."
-                    } else if (env.BRANCH_NAME == 'main') {
-                        sh "docker build -t ${IMAGE_NAME}:prod ."
-                    }
+                    sh "docker build -t ${DOCKER_IMAGE} ."
                 }
             }
         }
@@ -35,12 +30,9 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
-                    if (env.BRANCH_NAME == 'dev') {
-                        sh "docker push ${IMAGE_NAME}:dev"
-                    } else if (env.BRANCH_NAME == 'main') {
-                        sh "docker push ${IMAGE_NAME}:prod"
-                    }
+                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+                    sh "docker push ${DOCKER_IMAGE}"
+                    sh "docker logout"
                 }
             }
         }
@@ -48,26 +40,25 @@ pipeline {
         stage('Deploy to EC2') {
             steps {
                 script {
-                    // Example: You can use SSH + docker pull to deploy
-                    if (env.BRANCH_NAME == 'dev') {
-                        sh "ssh -i /path/to/dev-key.pem ubuntu@DEV_EC2_IP 'docker pull ${IMAGE_NAME}:dev && docker run -d -p 80:80 --name react-app ${IMAGE_NAME}:dev'"
-                    } else if (env.BRANCH_NAME == 'main') {
-                        sh "ssh -i /path/to/prod-key.pem ubuntu@PROD_EC2_IP 'docker pull ${IMAGE_NAME}:prod && docker run -d -p 80:80 --name react-app ${IMAGE_NAME}:prod'"
-                    }
+                    sh """
+                    ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${EC2_USER}@${EC2_IP} '
+                        docker pull ${DOCKER_IMAGE} &&
+                        docker stop react-app || true &&
+                        docker rm react-app || true &&
+                        docker run -d -p 80:80 --name react-app ${DOCKER_IMAGE}
+                    '
+                    """
                 }
             }
         }
     }
 
     post {
-        always {
-            sh "docker logout"
-        }
         success {
-            echo "Pipeline completed successfully for branch ${env.BRANCH_NAME}"
+            echo "Pipeline for DEV branch completed successfully!"
         }
         failure {
-            echo "Pipeline failed for branch ${env.BRANCH_NAME}"
+            echo "Pipeline failed!"
         }
     }
 }
