@@ -6,7 +6,7 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials-id')
         GIT_CREDENTIALS = credentials('github-credentials')
         EC2_USER = "ubuntu"
-        EC2_IP = "YOUR_EC2_PUBLIC_IP"   // replace with your EC2 public IP
+        EC2_IP = "3.80.23.124"   // replace with your EC2 public IP
         SSH_KEY = credentials('ec2-ssh-key') // Jenkins credential for EC2 private key
     }
 
