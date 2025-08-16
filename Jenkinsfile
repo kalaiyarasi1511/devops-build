@@ -13,7 +13,7 @@ pipeline {
         }
         stage('Run Docker') {
             steps {
-                sh 'docker run -d -p 3000:80 kalaiyarasi15/dev:latest'
+                sh 'docker run -d -p 3000:80 kalaiyarasi15/dev:latest || true'
             }
         }
     }
