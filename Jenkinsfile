@@ -2,12 +2,13 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "kalaiyarasi15/dev:latest"
-        DOCKERHUB_CREDENTIALS = "dockerhub-creds" // Add your Docker Hub credentials in Jenkins
+        DOCKERHUB_CREDENTIALS = 'dockerhub-creds'  // Add your DockerHub credentials in Jenkins
+        DOCKER_IMAGE = 'kalaiyarasi15/dev:latest'
+        GIT_REPO = 'https://github.com/kalaiyarasi1511/devops-build.git'
+        GIT_BRANCH = 'dev'
     }
 
     stages {
-
         stage('Clean Workspace') {
             steps {
                 cleanWs()
@@ -16,9 +17,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                checkout([$class: 'GitSCM',
-                          branches: [[name: '*/dev']],
-                          userRemoteConfigs: [[url: 'https://github.com/kalaiyarasi1511/devops-build.git']]])
+                git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
             }
         }
 
@@ -30,41 +29,49 @@ pipeline {
             }
         }
 
+        stage('Login to Docker Hub') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                    }
+                }
+            }
+        }
+
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", 
-                                                  usernameVariable: 'DOCKER_USER', 
-                                                  passwordVariable: 'DOCKER_PASS')]) {
-                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                script {
                     sh "docker push ${DOCKER_IMAGE}"
                 }
             }
         }
 
-        stage('Run Docker Container (Optional)') {
+        stage('Run Docker Container') {
             steps {
                 script {
-                    // Stop and remove any running container using this image
-                    sh "docker ps -q --filter ancestor=${DOCKER_IMAGE} | xargs -r docker stop"
-                    sh "docker ps -aq --filter ancestor=${DOCKER_IMAGE} | xargs -r docker rm"
-
-                    // Run the container on port 3001
-                    sh "docker run -d -p 3001:80 ${DOCKER_IMAGE}"
+                    // Stop and remove any existing container with the same name
+                    sh """
+                    if [ \$(docker ps -q -f name=dev-container) ]; then
+                        docker stop dev-container
+                        docker rm dev-container
+                    fi
+                    docker run -d -p 3001:80 --name dev-container ${DOCKER_IMAGE}
+                    """
                 }
             }
         }
-
     }
 
     post {
         always {
-            echo 'Pipeline finished!'
-        }
-        success {
-            echo 'Pipeline completed successfully!'
+            echo 'Pipeline finished.'
         }
         failure {
             echo 'Pipeline failed!'
+        }
+        success {
+            echo 'Pipeline succeeded!'
         }
     }
 }
