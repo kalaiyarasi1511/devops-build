@@ -3,24 +3,22 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "kalaiyarasi15/dev:latest"
-        DOCKERHUB_CREDENTIALS = "dockerhub-creds" // Jenkins Docker Hub credentials ID
-        GIT_REPO = "https://github.com/kalaiyarasi1511/devops-build.git"
-        GIT_BRANCH = "dev"
+        DOCKERHUB_CREDENTIALS = "dockerhub-creds" // Jenkins credentials ID for Docker Hub
+        APP_PORT = "3001" // Change if needed
     }
 
     stages {
-
         stage('Clean Workspace') {
             steps {
                 echo "Cleaning workspace..."
-                deleteDir() // removes all files in workspace
+                deleteDir()  // Cleans the Jenkins workspace completely
             }
         }
 
         stage('Checkout Code') {
             steps {
-                echo "Checking out ${GIT_BRANCH} branch from GitHub..."
-                git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
+                echo "Cloning dev branch..."
+                git branch: 'dev', url: 'https://github.com/kalaiyarasi1511/devops-build.git'
             }
         }
 
@@ -31,27 +29,27 @@ pipeline {
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Stop Existing Container') {
             steps {
-                echo "Logging in and pushing Docker image..."
-                withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
-                    sh "docker push ${DOCKER_IMAGE}"
-                }
+                echo "Stopping existing container if running..."
+                sh '''
+                if [ $(docker ps -q -f name=dev-app) ]; then
+                    docker stop dev-app
+                    docker rm dev-app
+                fi
+                '''
             }
         }
-    }
 
-    post {
-        always {
-            echo "Cleaning workspace after build..."
-            deleteDir()
+        stage('Run Docker Container') {
+            steps {
+                echo "Running Docker container on port ${APP_PORT}..."
+                sh "docker run -d --name dev-app -p ${APP_PORT}:80 ${DOCKER_IMAGE}"
+            }
         }
-        success {
-            echo "Pipeline finished successfully!"
-        }
-        failure {
-            echo "Pipeline failed. Check logs."
-        }
-    }
-}
+
+        stage('Push to Docker Hub') {
+            steps {
+                echo "Logging into Docker Hub and pushing image..."
+                withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
