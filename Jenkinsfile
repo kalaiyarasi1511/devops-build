@@ -2,49 +2,56 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials-id')
-        SSH_KEY = credentials('ec2-ssh-key-id')
+        DOCKER_IMAGE = "kalaiyarasi15/dev:latest"
+        DOCKERHUB_CREDENTIALS = "dockerhub-creds" // Jenkins Docker Hub credentials ID
+        GIT_REPO = "https://github.com/kalaiyarasi1511/devops-build.git"
+        GIT_BRANCH = "dev"
     }
 
     stages {
-        stage('Checkout') {
+
+        stage('Clean Workspace') {
             steps {
-                git branch: 'dev', url: 'https://github.com/kalaiyarasi1511/devops-build.git'
+                echo "Cleaning workspace..."
+                deleteDir() // removes all files in workspace
+            }
+        }
+
+        stage('Checkout Code') {
+            steps {
+                echo "Checking out ${GIT_BRANCH} branch from GitHub..."
+                git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t kalaiyarasi15/dev:latest .'
+                echo "Building Docker image..."
+                sh "docker build -t ${DOCKER_IMAGE} ."
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Push Docker Image') {
             steps {
-                sh '''
-                    echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS --password-stdin
-                    docker push kalaiyarasi15/dev:latest
-                '''
-            }
-        }
-
-        stage('Deploy to EC2') {
-            steps {
-                sh '''
-                    ssh -i /var/jenkins_home/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@YOUR_EC2_PUBLIC_IP '
-                        docker pull kalaiyarasi15/dev:latest
-                        docker stop react-app || true
-                        docker rm react-app || true
-                        docker run -d -p 3000:3000 --name react-app kalaiyarasi15/dev:latest
-                    '
-                '''
+                echo "Logging in and pushing Docker image..."
+                withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                    sh "docker push ${DOCKER_IMAGE}"
+                }
             }
         }
     }
 
     post {
+        always {
+            echo "Cleaning workspace after build..."
+            deleteDir()
+        }
+        success {
+            echo "Pipeline finished successfully!"
+        }
         failure {
-            echo "Pipeline failed!"
+            echo "Pipeline failed. Check logs."
         }
     }
 }
