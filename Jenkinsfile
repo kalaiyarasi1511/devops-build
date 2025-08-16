@@ -16,7 +16,7 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                sh 'docker login -u <your-dockerhub-username> -p <your-dockerhub-password>'
+                sh 'docker login -u kalaiyarasi15 -p dckr_pat_TmOqRtmE8ukIaiCBII0akszyN58'
                 sh 'docker push kalaiyarasi15/dev:latest'
             }
         }
