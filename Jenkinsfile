@@ -2,28 +2,22 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-cred')   // corrected
-        DEV_IMAGE = "kalaiyarasi15/dev"
-        PROD_IMAGE = "kalaiyarasi15/prod"
-    }
-
-    triggers {
-        githubPush()
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        DOCKERHUB_REPO = "kalaiyarasi15/mindtrack-app"   // Change to your repo name
+        APP_NAME = "mindtrack-app"
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
-                git branch: "${env.BRANCH_NAME}",
-                    url: 'https://github.com/kalaiyarasi1511/devops-build.git'
+                git branch: 'main', url: 'https://github.com/Vennilavan12/Trend.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    echo "Building Docker image for branch: ${env.BRANCH_NAME}"
-                    sh "docker build -t ${env.BRANCH_NAME}-app ."
+                    sh 'docker build -t $DOCKERHUB_REPO:latest .'
                 }
             }
         }
@@ -31,49 +25,37 @@ pipeline {
         stage('Login to DockerHub') {
             steps {
                 script {
-                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+                    sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
                 }
             }
         }
 
-        stage('Push to DockerHub') {
+        stage('Push Docker Image') {
             steps {
                 script {
-                    if (env.BRANCH_NAME == 'dev') {
-                        echo "Pushing to DEV repo..."
-                        sh """
-                            docker tag ${env.BRANCH_NAME}-app ${DEV_IMAGE}:latest
-                            docker push ${DEV_IMAGE}:latest
-                        """
-                    } else if (env.BRANCH_NAME == 'main') {
-                        echo "Pushing to PROD repo..."
-                        sh """
-                            docker tag ${env.BRANCH_NAME}-app ${PROD_IMAGE}:latest
-                            docker push ${PROD_IMAGE}:latest
-                        """
-                    } else {
-                        echo "Not pushing, branch is not dev or main."
-                    }
+                    sh 'docker push $DOCKERHUB_REPO:latest'
                 }
             }
         }
 
-        stage('Deploy') {
-            when {
-                branch 'main'
-            }
+        stage('Deploy to Kubernetes') {
             steps {
-                echo "🚀 Deploy step for PROD (add deployment script here)"
+                script {
+                    sh '''
+                    kubectl set image deployment/$APP_NAME $APP_NAME=$DOCKERHUB_REPO:latest --record
+                    kubectl rollout status deployment/$APP_NAME
+                    '''
+                }
             }
         }
     }
 
     post {
-        always {
-            script {
-                sh 'docker logout || true'
-            }
-            cleanWs()
+        success {
+            echo "✅ Deployment Successful!"
+        }
+        failure {
+            echo "❌ Pipeline Failed!"
         }
     }
 }
