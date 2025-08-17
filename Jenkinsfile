@@ -2,44 +2,56 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-cred')   // Jenkins credentials ID for DockerHub
-        DOCKERHUB_REPO = "kalaiyarasi1511/devops-build"         // Replace with your DockerHub repo
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-cred')   // change ID to your DockerHub credentials ID
+        IMAGE_NAME = "kalaiyarasi1511/devops-build"             // change to your repo name
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
                 git branch: "${env.BRANCH_NAME}", url: 'https://github.com/kalaiyarasi1511/devops-build.git'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build') {
             steps {
                 script {
-                    echo "Building Docker image..."
-                    sh "docker build -t ${DOCKERHUB_REPO}:${env.BRANCH_NAME}-${BUILD_NUMBER} ."
+                    echo "Building Docker image for branch: ${env.BRANCH_NAME}"
+                    sh "docker build -t ${IMAGE_NAME}:${env.BRANCH_NAME}-${BUILD_NUMBER} ."
                 }
             }
         }
 
-        stage('Push to DockerHub') {
+        stage('Login to DockerHub') {
             steps {
                 script {
-                    echo "Pushing image to DockerHub..."
-                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
-                    sh "docker push ${DOCKERHUB_REPO}:${env.BRANCH_NAME}-${BUILD_NUMBER}"
+                    sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
                 }
             }
         }
 
-        stage('Deploy Container') {
-            when {
-                branch 'dev'
-            }
+        stage('Push Image') {
             steps {
                 script {
-                    echo "Running container for DEV environment..."
-                    sh '''
-                    docker rm -f dev-container || true
-                    docker run -d --name dev-container -p 3000:80 ${DOCKERHUB_REPO}:${BRANCH_NAME}-${BUILD_NUMBER}
-                    '''
+                    echo "Pushing Docker image to DockerHub"
+                    sh "docker push ${IMAGE_NAME}:${env.BRANCH_NAME}-${BUILD_NUMBER}"
+
+                    // Latest tag only for main/master
+                    if (env.BRANCH_NAME == "main" || env.BRANCH_NAME == "master") {
+                        sh "docker tag ${IMAGE_NAME}:${env.BRANCH_NAME}-${BUILD_NUMBER} ${IMAGE_NAME}:latest"
+                        sh "docker push ${IMAGE_NAME}:latest"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline executed successfully ✅"
+        }
+        failure {
+            echo "Pipeline failed ❌"
+        }
+    }
+}
