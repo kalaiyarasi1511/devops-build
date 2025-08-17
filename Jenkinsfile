@@ -2,62 +2,45 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = 'dockerhub-creds'  // Add your DockerHub credentials in Jenkins
-        DOCKER_IMAGE = 'kalaiyarasi15/dev:latest'
-        GIT_REPO = 'https://github.com/kalaiyarasi1511/devops-build.git'
-        GIT_BRANCH = 'dev'
+        // Change this to your repo details
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-cred')  
+        DOCKERHUB_USER = 'kalaiyarasi1511'   // your DockerHub username
+        IMAGE_NAME = 'react-app'             // app name
     }
 
     stages {
-        stage('Clean Workspace') {
+        stage('Checkout') {
             steps {
-                cleanWs()
-            }
-        }
-
-        stage('Checkout Code') {
-            steps {
-                git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
+                git branch: "${env.BRANCH_NAME}", url: 'https://github.com/kalaiyarasi1511/devops-build.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh "docker build -t ${DOCKER_IMAGE} ."
+                    sh "docker build -t ${IMAGE_NAME}:${env.BRANCH_NAME} ."
                 }
             }
         }
 
-        stage('Login to Docker Hub') {
+        stage('Login to DockerHub') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_USER} --password-stdin"
+                }
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                script {
+                    if (env.BRANCH_NAME == 'dev') {
+                        sh "docker tag ${IMAGE_NAME}:${env.BRANCH_NAME} ${DOCKERHUB_USER}/${IMAGE_NAME}:dev"
+                        sh "docker push ${DOCKERHUB_USER}/${IMAGE_NAME}:dev"
+                    } else if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master') {
+                        sh "docker tag ${IMAGE_NAME}:${env.BRANCH_NAME} ${DOCKERHUB_USER}/${IMAGE_NAME}:latest"
+                        sh "docker push ${DOCKERHUB_USER}/${IMAGE_NAME}:latest"
                     }
-                }
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                script {
-                    sh "docker push ${DOCKER_IMAGE}"
-                }
-            }
-        }
-
-        stage('Run Docker Container') {
-            steps {
-                script {
-                    // Stop and remove any existing container with the same name
-                    sh """
-                    if [ \$(docker ps -q -f name=dev-container) ]; then
-                        docker stop dev-container
-                        docker rm dev-container
-                    fi
-                    docker run -d -p 3001:80 --name dev-container ${DOCKER_IMAGE}
-                    """
                 }
             }
         }
@@ -65,13 +48,7 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline finished.'
-        }
-        failure {
-            echo 'Pipeline failed!'
-        }
-        success {
-            echo 'Pipeline succeeded!'
+            sh "docker logout"
         }
     }
 }
