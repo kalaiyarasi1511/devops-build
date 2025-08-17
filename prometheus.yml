@@ -2,6 +2,10 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'docker-app'
+  - job_name: 'prometheus'
     static_configs:
-      - targets: ['host.docker.internal:3000']
+      - targets: ['localhost:9090']
+
+  - job_name: 'react-app'
+    static_configs:
+      - targets: ['localhost:80']   # <-- React app is running on port 80
