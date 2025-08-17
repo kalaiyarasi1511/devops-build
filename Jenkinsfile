@@ -1,20 +1,77 @@
 pipeline {
     agent any
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')   // Jenkins credential ID for DockerHub
+        DEV_IMAGE = "kalaiyarasi15/dev"
+        PROD_IMAGE = "kalaiyarasi15/prod"
+    }
+
+    triggers {
+        githubPush()   // Auto-trigger on GitHub webhook
+    }
+
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'dev', url: 'https://github.com/kalaiyarasi1511/devops-build.git'
+                git branch: "${env.BRANCH_NAME}", 
+                    url: 'https://github.com/kalaiyarasi1511/devops-build.git'
             }
         }
-        stage('Build Docker') {
+
+        stage('Build Docker Image') {
             steps {
-                sh 'docker build -t kalaiyarasi15/dev:latest .'
+                script {
+                    echo "Building Docker image for branch: ${env.BRANCH_NAME}"
+                    sh "docker build -t ${env.BRANCH_NAME}-app ."
+                }
             }
         }
-        stage('Run Docker') {
+
+        stage('Login to DockerHub') {
             steps {
-                sh 'docker run -d -p 3000:80 kalaiyarasi15/dev:latest || true'
+                script {
+                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+                }
             }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                script {
+                    if (env.BRANCH_NAME == 'dev') {
+                        echo "Pushing to DEV repo..."
+                        sh """
+                            docker tag ${env.BRANCH_NAME}-app ${DEV_IMAGE}:latest
+                            docker push ${DEV_IMAGE}:latest
+                        """
+                    } else if (env.BRANCH_NAME == 'master') {
+                        echo "Pushing to PROD repo..."
+                        sh """
+                            docker tag ${env.BRANCH_NAME}-app ${PROD_IMAGE}:latest
+                            docker push ${PROD_IMAGE}:latest
+                        """
+                    } else {
+                        echo "Not pushing, branch is not dev or master."
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            when {
+                branch 'master'
+            }
+            steps {
+                echo "🚀 Deploy step for PROD (you can add Kubernetes/EKS/EC2 deployment here)."
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker logout'
+            cleanWs()
         }
     }
 }
