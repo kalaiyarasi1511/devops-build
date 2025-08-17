@@ -7,5 +7,16 @@ scrape_configs:
       - targets: ['localhost:9090']
 
   - job_name: 'react-app'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]   # Check if HTTP returns 200
     static_configs:
-      - targets: ['localhost:80']   # <-- React app is running on port 80
+      - targets:
+          - http://localhost:80   # Your React app
+    relabel_configs:
+      - source_labels: [_address_]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: _address_
+        replacement: blackbox:9115
