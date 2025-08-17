@@ -2,60 +2,44 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
-        DOCKERHUB_REPO = "kalaiyarasi15/mindtrack-app"   // Change to your repo name
-        APP_NAME = "mindtrack-app"
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-cred')   // Jenkins credentials ID for DockerHub
+        DOCKERHUB_REPO = "kalaiyarasi1511/devops-build"         // Replace with your DockerHub repo
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/Vennilavan12/Trend.git'
+                git branch: "${env.BRANCH_NAME}", url: 'https://github.com/kalaiyarasi1511/devops-build.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh 'docker build -t $DOCKERHUB_REPO:latest .'
+                    echo "Building Docker image..."
+                    sh "docker build -t ${DOCKERHUB_REPO}:${env.BRANCH_NAME}-${BUILD_NUMBER} ."
                 }
             }
         }
 
-        stage('Login to DockerHub') {
+        stage('Push to DockerHub') {
             steps {
                 script {
-                    sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
+                    echo "Pushing image to DockerHub..."
+                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+                    sh "docker push ${DOCKERHUB_REPO}:${env.BRANCH_NAME}-${BUILD_NUMBER}"
                 }
             }
         }
 
-        stage('Push Docker Image') {
-            steps {
-                script {
-                    sh 'docker push $DOCKERHUB_REPO:latest'
-                }
+        stage('Deploy Container') {
+            when {
+                branch 'dev'
             }
-        }
-
-        stage('Deploy to Kubernetes') {
             steps {
                 script {
+                    echo "Running container for DEV environment..."
                     sh '''
-                    kubectl set image deployment/$APP_NAME $APP_NAME=$DOCKERHUB_REPO:latest --record
-                    kubectl rollout status deployment/$APP_NAME
+                    docker rm -f dev-container || true
+                    docker run -d --name dev-container -p 3000:80 ${DOCKERHUB_REPO}:${BRANCH_NAME}-${BUILD_NUMBER}
                     '''
-                }
-            }
-        }
-    }
-
-    post {
-        success {
-            echo "✅ Deployment Successful!"
-        }
-        failure {
-            echo "❌ Pipeline Failed!"
-        }
-    }
-}
