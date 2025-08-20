@@ -1,11 +1,31 @@
-version: '3.8'
+version: '3'
 
 services:
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3001:3000"   # Grafana accessible at port 3001
+    volumes:
+      - grafana-data:/var/lib/grafana
+
   uptime-kuma:
-    image: louislam/uptime-kuma:1
+    image: louislam/uptime-kuma
     container_name: uptime-kuma
     restart: always
     ports:
-      - "3001:3001"   # Uptime Kuma UI
+      - "3002:3001"   # Uptime Kuma accessible at port 3002
     volumes:
-      - ./uptime-kuma-data:/app/data
+      - uptime-kuma-data:/app/data
+
+volumes:
+  grafana-data:
+  uptime-kuma-data:
