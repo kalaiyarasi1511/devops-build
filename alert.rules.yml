@@ -2,19 +2,19 @@ groups:
 - name: app-monitoring
   rules:
   - alert: AppDown
-    expr: probe_success{instance="http://YOUR-APP-HOST:80"} == 0
+    expr: probe_success{instance="http://52.23.155.243:80"} == 0
     for: 1m
     labels:
       severity: critical
     annotations:
       summary: "Application down"
-      description: "The application at {{ $labels.instance }} is down for more than 1 minute."
+      description: "The application at http://52.23.155.243:80 is down for more than 1 minute."
 
   - alert: HighResponseTime
-    expr: probe_http_duration_seconds{instance="http://YOUR-APP-HOST:80", phase="total"} > 2
+    expr: probe_http_duration_seconds{instance="http://52.23.155.243:80", phase="total"} > 2
     for: 5m
     labels:
       severity: warning
     annotations:
       summary: "High response time"
-      description: "Response time for {{ $labels.instance }} is over 2 seconds for 5 minutes."
+      description: "Response time for http://52.23.155.243:80 is over 2 seconds for 5 minutes."
