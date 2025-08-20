@@ -5,7 +5,8 @@ global:
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: ['alertmanager:9093']
+        - targets:
+            - 'alertmanager:9093'
 
 rule_files:
   - "alert.rules.yml"
@@ -14,4 +15,18 @@ scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
-  # Add other exporter jobs (Node exporter, Blackbox, etc.) here as needed.
+      
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://52.23.155.243:80
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115  # Blackbox exporter URL inside Docker network
