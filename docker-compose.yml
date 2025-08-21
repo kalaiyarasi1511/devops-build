@@ -1,25 +1,32 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  dev-app:
-    image: kalaiyarasi15/dev:latest
-    container_name: dev-app
+  prod-app:
+    image: kalaiyarasi15/prod:latest
+    container_name: prod-app
     ports:
       - "80:80"
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+    depends_on:
+      - prod-app
+      - node-exporter
+      - cadvisor
 
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
       - "3000:3000"
+    restart: unless-stopped
     depends_on:
       - prometheus
 
@@ -27,11 +34,12 @@ services:
     image: quay.io/prometheus/node-exporter:latest
     container_name: node-exporter
     network_mode: "host"
+    restart: unless-stopped
     pid: "host"
     volumes:
-      - "/:/host:ro"
+      - /:/host:ro
     command:
-      - "--path.rootfs=/host"
+      - --path.rootfs=/host
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -39,7 +47,8 @@ services:
     ports:
       - "8081:8080"
     volumes:
-      - "/:/rootfs:ro"
-      - "/var/run:/var/run:ro"
-      - "/sys:/sys:ro"
-      - "/var/lib/docker/:/var/lib/docker:ro"
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    restart: unless-stopped
