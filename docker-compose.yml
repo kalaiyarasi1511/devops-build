@@ -1,31 +1,63 @@
-version: '3'
+version: '3.8'
 
 services:
+  # Dev React App
+  dev-app:
+    image: kalaiyarasi15/dev:latest
+    container_name: dev-app
+    restart: unless-stopped
+    ports:
+      - "3000:80"  # dev accessible from host port 3000
+
+  # Prod React App
+  prod-app:
+    image: kalaiyarasi15/prod:latest
+    container_name: prod-app
+    restart: unless-stopped
+    ports:
+      - "80:80"  # prod accessible from host port 80
+
+  # Prometheus
   prometheus:
-    image: prom/prometheus
+    image: prom/prometheus:latest
     container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
     ports:
       - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    restart: unless-stopped
 
+  # Grafana
   grafana:
-    image: grafana/grafana
+    image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3001:3000"   # Grafana accessible at port 3001
-    volumes:
-      - grafana-data:/var/lib/grafana
+      - "3001:3000"
+    restart: unless-stopped
+    depends_on:
+      - prometheus
 
-  uptime-kuma:
-    image: louislam/uptime-kuma
-    container_name: uptime-kuma
-    restart: always
+  # cAdvisor (Docker container metrics)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
     ports:
-      - "3002:3001"   # Uptime Kuma accessible at port 3002
+      - "8081:8080"
     volumes:
-      - uptime-kuma-data:/app/data
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    restart: unless-stopped
 
-volumes:
-  grafana-data:
-  uptime-kuma-data:
+  # Node Exporter (host metrics)
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+    pid: "host"
+    network_mode: "host"
