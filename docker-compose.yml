@@ -1,63 +1,45 @@
 version: '3.8'
 
 services:
-  # Dev React App
   dev-app:
     image: kalaiyarasi15/dev:latest
     container_name: dev-app
-    restart: unless-stopped
     ports:
-      - "3000:80"  # dev accessible from host port 3000
+      - "80:80"
 
-  # Prod React App
-  prod-app:
-    image: kalaiyarasi15/prod:latest
-    container_name: prod-app
-    restart: unless-stopped
-    ports:
-      - "80:80"  # prod accessible from host port 80
-
-  # Prometheus
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
-    restart: unless-stopped
 
-  # Grafana
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3001:3000"
-    restart: unless-stopped
+      - "3000:3000"
     depends_on:
       - prometheus
 
-  # cAdvisor (Docker container metrics)
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: node-exporter
+    network_mode: "host"
+    pid: "host"
+    volumes:
+      - "/:/host:ro"
+    command:
+      - "--path.rootfs=/host"
+
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: cadvisor
     ports:
       - "8081:8080"
     volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-    restart: unless-stopped
-
-  # Node Exporter (host metrics)
-  node-exporter:
-    image: prom/node-exporter:latest
-    container_name: node-exporter
-    ports:
-      - "9100:9100"
-    restart: unless-stopped
-    pid: "host"
-    network_mode: "host"
+      - "/:/rootfs:ro"
+      - "/var/run:/var/run:ro"
+      - "/sys:/sys:ro"
+      - "/var/lib/docker/:/var/lib/docker:ro"
