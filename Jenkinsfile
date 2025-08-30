@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')   // Jenkins credential ID for DockerHub
-        DEV_IMAGE = "kalaiyarasi15/dev"
-        PROD_IMAGE = "kalaiyarasi15/prod"
+        DEV_IMAGE = "kalaiyarasi15/react-dev"
+        PROD_IMAGE = "kalaiyarasi15/react-prod"
     }
 
     triggers {
