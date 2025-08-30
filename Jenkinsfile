@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
-        DOCKER_IMAGE = "kalaiyarasi15/devops-build"
+        DOCKER_IMAGE = "kalaiyarasi15/react-prod"
     }
 
     stages {
