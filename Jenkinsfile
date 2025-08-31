@@ -2,34 +2,50 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
-        DOCKER_IMAGE = "kalaiyarasi15/react-prod"
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')   // Jenkins credentials for DockerHub
+        IMAGE_NAME = "kalaiyarasi15/react-prod"
     }
 
     stages {
-        stage('Clone Repository') {
+        stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/kalaiyarasi1511/devops-build.git'
+                git branch: 'dev', url: 'https://github.com/kalaiyarasi1511/devops-build.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh 'docker build -t $DOCKER_IMAGE:$BUILD_NUMBER .'
+                    echo "📦 Building Docker image..."
+                    sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} ."
                 }
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Push to DockerHub') {
             steps {
                 script {
-                    sh '''
-                        echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
-                        docker push $DOCKER_IMAGE:$BUILD_NUMBER
-                        docker tag $DOCKER_IMAGE:$BUILD_NUMBER $DOCKER_IMAGE:latest
-                        docker push $DOCKER_IMAGE:latest
-                    '''
+                    echo "🔑 Logging in to DockerHub..."
+                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+
+                    echo "⬆️ Pushing image to DockerHub..."
+                    sh """
+                        docker push ${IMAGE_NAME}:${BUILD_NUMBER}
+                        docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:latest
+                        docker push ${IMAGE_NAME}:latest
+                    """
+                }
+            }
+        }
+
+        stage('Deploy Container') {
+            steps {
+                script {
+                    echo "🚀 Deploying new container..."
+                    sh """
+                        docker rm -f react-app || true
+                        docker run -d --name react-app -p 80:80 ${IMAGE_NAME}:latest
+                    """
                 }
             }
         }
@@ -37,10 +53,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Docker image built and pushed successfully!'
+            echo "✅ Deployment successful! App is live at http://<EC2-PUBLIC-IP>"
         }
         failure {
-            echo '❌ Pipeline failed. Check logs.'
+            echo "❌ Deployment failed. Check logs."
         }
     }
 }
