@@ -2,10 +2,10 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'prod-app'
+  - job_name: 'dev-app'
     metrics_path: /metrics
     static_configs:
-      - targets: ['prod-app:80']
+      - targets: ['dev-app:80']
 
   - job_name: 'node-exporter'
     static_configs:
