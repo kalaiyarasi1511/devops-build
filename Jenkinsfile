@@ -2,36 +2,22 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')   // Jenkins credential ID for DockerHub
-        DEV_IMAGE = "kalaiyarasi15/react-dev"
-        PROD_IMAGE = "kalaiyarasi15/react-prod"
-    }
-
-    triggers {
-        githubPush()   // Auto-trigger on GitHub webhook
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')   // Jenkins credentials for DockerHub
+        IMAGE_NAME = "kalaiyarasi15/react-dev"
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
-                git branch: "${env.BRANCH_NAME}", 
-                    url: 'https://github.com/kalaiyarasi1511/devops-build.git'
+                git branch: 'dev', url: 'https://github.com/kalaiyarasi1511/devops-build.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    echo "Building Docker image for branch: ${env.BRANCH_NAME}"
-                    sh "docker build -t ${env.BRANCH_NAME}-app ."
-                }
-            }
-        }
-
-        stage('Login to DockerHub') {
-            steps {
-                script {
-                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+                    echo "📦 Building Docker image..."
+                    sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} ."
                 }
             }
         }
@@ -39,39 +25,38 @@ pipeline {
         stage('Push to DockerHub') {
             steps {
                 script {
-                    if (env.BRANCH_NAME == 'dev') {
-                        echo "Pushing to DEV repo..."
-                        sh """
-                            docker tag ${env.BRANCH_NAME}-app ${DEV_IMAGE}:latest
-                            docker push ${DEV_IMAGE}:latest
-                        """
-                    } else if (env.BRANCH_NAME == 'master') {
-                        echo "Pushing to PROD repo..."
-                        sh """
-                            docker tag ${env.BRANCH_NAME}-app ${PROD_IMAGE}:latest
-                            docker push ${PROD_IMAGE}:latest
-                        """
-                    } else {
-                        echo "Not pushing, branch is not dev or master."
-                    }
+                    echo "🔑 Logging in to DockerHub..."
+                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+
+                    echo "⬆️ Pushing image to DockerHub..."
+                    sh """
+                        docker push ${IMAGE_NAME}:${BUILD_NUMBER}
+                        docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:latest
+                        docker push ${IMAGE_NAME}:latest
+                    """
                 }
             }
         }
 
-        stage('Deploy') {
-            when {
-                branch 'master'
-            }
+        stage('Deploy Container') {
             steps {
-                echo "🚀 Deploy step for PROD (you can add Kubernetes/EKS/EC2 deployment here)."
+                script {
+                    echo "🚀 Deploying new container..."
+                    sh """
+                        docker rm -f react-app || true
+                        docker run -d --name react-app -p 80:80 ${IMAGE_NAME}:latest
+                    """
+                }
             }
         }
     }
 
     post {
-        always {
-            sh 'docker logout'
-            cleanWs()
+        success {
+            echo "✅ Deployment successful! App is live at http://<EC2-PUBLIC-IP>"
+        }
+        failure {
+            echo "❌ Deployment failed. Check logs."
         }
     }
 }
