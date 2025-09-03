@@ -1,12 +1,13 @@
 version: "3.8"
 
 services:
-  prod-app:
-    image: kalaiyarasi15/prod:latest
-    container_name: prod-app
+  react-app:
+    image: kalaiyarasi15/react-dev:latest
+    container_name: react-app
     ports:
       - "80:80"
-    restart: unless-stopped
+    networks:
+      - monitor-net
 
   prometheus:
     image: prom/prometheus:latest
@@ -14,32 +15,19 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    restart: unless-stopped
-    depends_on:
-      - prod-app
-      - node-exporter
-      - cadvisor
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - monitor-net
 
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
       - "3000:3000"
-    restart: unless-stopped
     depends_on:
       - prometheus
-
-  node-exporter:
-    image: quay.io/prometheus/node-exporter:latest
-    container_name: node-exporter
-    network_mode: "host"
-    restart: unless-stopped
-    pid: "host"
-    volumes:
-      - /:/host:ro
-    command:
-      - --path.rootfs=/host
+    networks:
+      - monitor-net
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -51,4 +39,17 @@ services:
       - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
-    restart: unless-stopped
+    networks:
+      - monitor-net
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    networks:
+      - monitor-net
+
+networks:
+  monitor-net:
+    driver: bridge
