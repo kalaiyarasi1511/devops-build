@@ -17,5 +17,5 @@ scrape_configs:
   - job_name: 'prod-app'
     metrics_path: "/healthz"
     static_configs:
-      - targets: ['react-app:80']
+      - targets: ['prod-app:80']
 
