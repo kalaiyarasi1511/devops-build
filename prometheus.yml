@@ -15,5 +15,6 @@ scrape_configs:
       - targets: ["node-exporter:9100"]
 
   - job_name: "react-app"
+    metrics_path: /
     static_configs:
       - targets: ["react-app:80"]
