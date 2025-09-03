@@ -14,7 +14,6 @@ scrape_configs:
     static_configs:
       - targets: ["node-exporter:9100"]
 
-  - job_name: "prod-app"
-    metrics_path: /metrics
+  - job_name: 'prod-app'
     static_configs:
-      - targets: ["prod-app:80"]
+      - targets: ['host.docker.internal:80']
