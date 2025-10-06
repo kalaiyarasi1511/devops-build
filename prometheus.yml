@@ -14,7 +14,7 @@ scrape_configs:
     static_configs:
       - targets: ["cadvisor:8080"]
 
-  - job_name: "react-app"
+  - job_name: "prod-app"
     metrics_path: /   # if your React app has /metrics endpoint change here
     static_configs:
-      - targets: ["react-app:80"]
+      - targets: ["prod-app:80"]
