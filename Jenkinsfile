@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')   // Jenkins credentials for DockerHub
-        IMAGE_NAME = "kalaiyarasi15/react-prod"
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        IMAGE_NAME = "kalaiyarasi15/react-dev"
     }
 
     stages {
@@ -38,7 +38,7 @@ pipeline {
             }
         }
 
-        stage('Deploy Container') {
+        stage('Deploy Container (Dev)') {
             steps {
                 script {
                     echo "🚀 Deploying new container..."
@@ -53,7 +53,7 @@ pipeline {
 
     post {
         success {
-            echo "✅ Deployment successful! App is live at http://<EC2-PUBLIC-IP>"
+            echo "✅ Dev Deployment successful! App is live at http://<EC2-PUBLIC-IP>"
         }
         failure {
             echo "❌ Deployment failed. Check logs."
