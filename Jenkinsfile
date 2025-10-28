@@ -1,91 +1,94 @@
 pipeline {
   agent any
 
+  environment {
+    // Jenkins credential with your Docker Hub username/password
+    // -> Manage Jenkins > Credentials > (Global) > Username with password
+    // ID must be: dockerhub-creds
+    DOCKERHUB = credentials('dockerhub-creds')
+  }
+
   options {
     timestamps()
-    disableConcurrentBuilds()
   }
-
-  parameters {
-    booleanParam(name: 'PUSH_LATEST', defaultValue: false, description: 'Also push :latest')
-  }
-
-  environment {
-    IMAGE_REPO_DEV  = 'kalaiyarasi15/react-dev'
-    IMAGE_REPO_PROD = 'kalaiyarasi15/react-prod'
-    IMAGE_REPO      = ''
-    IMAGE_TAG       = "${BUILD_NUMBER}"
-  }
-
-  triggers { pollSCM('@hourly') }
 
   stages {
     stage('Select Image Repo (by branch)') {
       steps {
         script {
-          if (env.BRANCH_NAME == 'dev') {
-            env.IMAGE_REPO = env.IMAGE_REPO_DEV
-          } else if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master') {
-            env.IMAGE_REPO = env.IMAGE_REPO_PROD
+          // BRANCH_NAME exists automatically in Multibranch pipelines.
+          // Fallback to 'dev' if not present (e.g., classic pipeline).
+          def branch = env.BRANCH_NAME ?: 'dev'
+
+          // Map branch -> Docker Hub repo
+          if (branch == 'dev') {
+            env.IMAGE_REPO = 'kalaiyarasi15/react-dev'
+          } else if (branch == 'main' || branch == 'master') {
+            env.IMAGE_REPO = 'kalaiyarasi15/react-prod'
           } else {
-            env.IMAGE_REPO = env.IMAGE_REPO_DEV
+            // Optional: treat all other branches as dev
+            env.IMAGE_REPO = 'kalaiyarasi15/react-dev'
           }
-          echo "Repo: ${env.IMAGE_REPO}"
+
+          echo "Using image repo: ${env.IMAGE_REPO}"
         }
       }
     }
 
     stage('Checkout Code') {
       steps {
-        git branch: "${env.BRANCH_NAME ?: 'dev'}", url: 'https://github.com/kalaiyarasi1511/devops-build.git'
+        // Adjust branch as needed; in Multibranch this is done for you.
+        git branch: 'dev', url: 'https://github.com/kalaiyarasi1511/devops-build.git'
       }
     }
 
     stage('Docker Build') {
       steps {
-        sh "docker build -t ${env.IMAGE_REPO}:${env.IMAGE_TAG} ."
+        sh """
+          docker build -t ${IMAGE_REPO}:${BUILD_NUMBER} .
+        """
       }
     }
 
     stage('Docker Login & Push') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
-          sh 'echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin'
-          sh "docker push ${env.IMAGE_REPO}:${env.IMAGE_TAG}"
-          script {
-            if (params.PUSH_LATEST) {
-              sh """
-                docker tag ${env.IMAGE_REPO}:${env.IMAGE_TAG} ${env.IMAGE_REPO}:latest
-                docker push ${env.IMAGE_REPO}:latest
-              """
-            }
-          }
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                                          usernameVariable: 'DH_USER',
+                                          passwordVariable: 'DH_PASS')]) {
+          sh """
+            echo "\$DH_PASS" | docker login -u "\$DH_USER" --password-stdin
+            docker push ${IMAGE_REPO}:${BUILD_NUMBER}
+            # Try to tag/push :latest too; if your repo blocks 'latest', ignore the error
+            docker tag ${IMAGE_REPO}:${BUILD_NUMBER} ${IMAGE_REPO}:latest || true
+            docker push ${IMAGE_REPO}:latest || true
+          """
         }
       }
     }
 
     stage('Deploy on EC2') {
       steps {
-        script {
-          def cname = (env.IMAGE_REPO == env.IMAGE_REPO_PROD) ? 'prod-app' : 'react-app'
-          sh """
-            docker rm -f ${cname} || true
-            docker run -d --name ${cname} -p 80:80 ${env.IMAGE_REPO}:${env.IMAGE_TAG}
-            docker image prune -f || true
-          """
-        }
+        // Runs container on the Jenkins node/EC2 where Docker is installed.
+        // If you deploy elsewhere, replace with SSH or your deployment step.
+        sh """
+          docker rm -f react-app || true
+          docker pull ${IMAGE_REPO}:${BUILD_NUMBER}
+          docker run -d --name react-app -p 80:80 ${IMAGE_REPO}:${BUILD_NUMBER}
+        """
+        echo "Deployed ${IMAGE_REPO}:${BUILD_NUMBER} -> http://<65.2.167.227>"
       }
     }
   }
 
   post {
-    success {
-      script {
-        def ip = sh(returnStdout: true, script: "curl -s http://169.254.169.254/latest/meta-data/public-ipv4 || true").trim()
-        echo "✅ Deployed: http://${ip}/"
-      }
+    always {
+      sh 'docker logout || true'
     }
-    failure { echo '❌ Pipeline failed.' }
-    always { sh 'docker logout || true' }
+    success {
+      echo '✅ Pipeline successful.'
+    }
+    failure {
+      echo '❌ Pipeline failed.'
+    }
   }
 }
