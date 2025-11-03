@@ -46,3 +46,15 @@ services:
 networks:
   monitor-net:
     driver: bridge
+
+services:
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:0.11.0
+    container_name: nginx-exporter
+    environment:
+      - NGINX_EXPORTER_PROMETHEUS_ON=true
+      - NGINX_STATUS_URL=http://prod-app/nginx_status   # adjust hostname/path if needed
+    ports:
+      - "9113:9113"
+    networks:
+      - monitor-net   # use same network as prometheus/grafana
