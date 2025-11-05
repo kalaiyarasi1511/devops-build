@@ -46,12 +46,13 @@ services:
 networks:
   monitor-net:
     driver: bridge
-
 services:
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:0.11.0
     command: ["-nginx.scrape-uri", "http://react-app:80/nginx_status"]
-    restart: unless-stopped
+    depends_on:
+      - react-app
     networks:
       - monitor-net
+
 
